@@ -1,2 +1,2 @@
-E001,2026-09-25,Initial exact normalized name blocking,Exact normalized name,None,Name normalization,,85.2%,N/A,N/A,COMPLETED,Baseline blocker
-E002,2026-09-25,Name plus address blocking,Multi-pass,None,Name+address,,94.1%,N/A,N/A,COMPLETED,Improved recall
+
+E001,2026-09-25,Exact normalized name blocking baseline,Exact normalized name,None,Unicode-safe name normalization,,24.6214%,N/A,N/A,COMPLETED,Recovered 1880670 of 7638365 true links; average 11.2585 candidates per S1
