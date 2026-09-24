@@ -1,0 +1,2 @@
+E001,2026-09-25,Initial exact normalized name blocking,Exact normalized name,None,Name normalization,,85.2%,N/A,N/A,COMPLETED,Baseline blocker
+E002,2026-09-25,Name plus address blocking,Multi-pass,None,Name+address,,94.1%,N/A,N/A,COMPLETED,Improved recall
