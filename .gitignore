@@ -2,6 +2,10 @@
 __pycache__/
 *.pyc
 
+# Challenge data: keep local only. These TSVs are 120-490 MB each
+# (well over GitHub's 100 MB per-file limit), so they are never committed.
+dataset/
+
 models/
 outputs/
 
