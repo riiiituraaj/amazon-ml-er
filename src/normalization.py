@@ -2,8 +2,10 @@ import re
 import unicodedata
 
 
-# Common business/legal abbreviations.
-# We keep this deliberately conservative.
+# ---------------------------------------------------------------------------
+# BUSINESS NAME REPLACEMENTS
+# ---------------------------------------------------------------------------
+
 NAME_REPLACEMENTS = {
     "corporation": "corp",
     "company": "co",
@@ -16,6 +18,10 @@ NAME_REPLACEMENTS = {
     "private limited": "pvtltd",
 }
 
+
+# ---------------------------------------------------------------------------
+# ADDRESS REPLACEMENTS
+# ---------------------------------------------------------------------------
 
 ADDRESS_REPLACEMENTS = {
     "road": "rd",
@@ -30,12 +36,19 @@ ADDRESS_REPLACEMENTS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# BASIC UNICODE FUNCTIONS
+# ---------------------------------------------------------------------------
+
 def unicode_normalize(text: str) -> str:
     """
     Normalize Unicode characters while preserving non-Latin scripts.
     """
-    text = unicodedata.normalize("NFKC", text)
-    return text
+
+    if text is None:
+        return ""
+
+    return unicodedata.normalize("NFKC", str(text))
 
 
 def basic_clean(text: str) -> str:
@@ -48,7 +61,7 @@ def basic_clean(text: str) -> str:
     - Unicode numbers
     - whitespace
 
-    Converts punctuation/symbols into spaces.
+    Converts punctuation and symbols into spaces.
     """
 
     if text is None:
@@ -56,7 +69,6 @@ def basic_clean(text: str) -> str:
 
     text = unicodedata.normalize("NFKC", str(text)).lower()
 
-    # Treat common null-like values as empty.
     if text.strip() in {"nan", "none", "null"}:
         return ""
 
@@ -65,32 +77,31 @@ def basic_clean(text: str) -> str:
     for char in text:
         category = unicodedata.category(char)
 
-        # Preserve whitespace.
         if char.isspace():
             cleaned.append(" ")
 
-        # Preserve letters, combining marks and numbers.
         elif category[0] in {"L", "M", "N"}:
             cleaned.append(char)
 
-        # Replace punctuation/symbols with a space.
         else:
             cleaned.append(" ")
 
     text = "".join(cleaned)
 
-    # Collapse repeated whitespace.
-    text = re.sub(r"\s+", " ", text).strip()
+    return re.sub(r"\s+", " ", text).strip()
 
-    return text
+
+# ---------------------------------------------------------------------------
+# ORIGINAL E001 NORMALIZATION
+# ---------------------------------------------------------------------------
 
 def normalize_name(text: str) -> str:
     """
-    Create a conservative normalized business name.
+    Conservative normalized business name.
     """
+
     text = basic_clean(text)
 
-    # Longest phrases first.
     for old, new in sorted(
         NAME_REPLACEMENTS.items(),
         key=lambda x: len(x[0]),
@@ -102,16 +113,14 @@ def normalize_name(text: str) -> str:
             text,
         )
 
-    # Remove repeated whitespace again after replacement.
-    text = re.sub(r"\s+", " ", text).strip()
-
-    return text
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def normalize_address(text: str) -> str:
     """
-    Create a conservative normalized address.
+    Conservative normalized address.
     """
+
     text = basic_clean(text)
 
     for old, new in sorted(
@@ -125,15 +134,14 @@ def normalize_address(text: str) -> str:
             text,
         )
 
-    text = re.sub(r"\s+", " ", text).strip()
-
-    return text
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def extract_numbers(text: str) -> list[str]:
     """
     Extract numeric sequences from a string.
     """
+
     if not text:
         return []
 
@@ -144,6 +152,7 @@ def name_tokens(text: str) -> list[str]:
     """
     Return whitespace-separated normalized name tokens.
     """
+
     normalized = normalize_name(text)
 
     if not normalized:
@@ -156,9 +165,164 @@ def address_tokens(text: str) -> list[str]:
     """
     Return whitespace-separated normalized address tokens.
     """
+
     normalized = normalize_address(text)
 
     if not normalized:
         return []
 
     return normalized.split()
+
+
+# ---------------------------------------------------------------------------
+# E004 - LATIN DIACRITIC FOLDING
+# ---------------------------------------------------------------------------
+
+def fold_latin_diacritics(text: str) -> str:
+    """
+    Remove accent marks from Latin characters.
+
+    Examples:
+        Récord -> Record
+        Cáre   -> Care
+        Índia  -> India
+
+    Combining marks belonging to non-Latin scripts are preserved.
+    """
+
+    if not text:
+        return ""
+
+    decomposed = unicodedata.normalize("NFD", str(text))
+
+    result = []
+
+    remove_next_marks = False
+
+    for char in decomposed:
+        category = unicodedata.category(char)
+
+        # Combining mark.
+        if category.startswith("M"):
+            if remove_next_marks:
+                continue
+
+            result.append(char)
+            continue
+
+        # This is a base character.
+        char_name = unicodedata.name(char, "")
+
+        # Only Latin base characters get their accents removed.
+        remove_next_marks = char_name.startswith("LATIN ")
+
+        result.append(char)
+
+    # IMPORTANT:
+    # NFC recomposes the characters that remain,
+    # but no Latin accent marks remain because they
+    # were removed above.
+    return unicodedata.normalize("NFC", "".join(result))
+
+
+# ---------------------------------------------------------------------------
+# E004 - IMPROVED NAME NORMALIZATION
+# ---------------------------------------------------------------------------
+
+def normalize_name_v2(text: str) -> str:
+    """
+    Improved business-name normalization.
+
+    Pipeline:
+
+        raw text
+            ↓
+        basic Unicode cleaning
+            ↓
+        Latin accent removal
+            ↓
+        legal/business abbreviation normalization
+    """
+
+    text = basic_clean(text)
+
+    if not text:
+        return ""
+
+    text = fold_latin_diacritics(text)
+
+    for old, new in sorted(
+        NAME_REPLACEMENTS.items(),
+        key=lambda x: len(x[0]),
+        reverse=True,
+    ):
+        text = re.sub(
+            rf"\b{re.escape(old)}\b",
+            new,
+            text,
+        )
+
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def normalize_name_token_sorted(text: str) -> str:
+    """
+    Improved normalized representation that is
+    insensitive to word order.
+    """
+
+    normalized = normalize_name_v2(text)
+
+    if not normalized:
+        return ""
+
+    tokens = normalized.split()
+
+    return " ".join(sorted(tokens))
+
+# ---------------------------------------------------------------------------
+# E005 - ADDRESS COMPONENTS
+# ---------------------------------------------------------------------------
+
+def extract_address_components(text: str) -> dict[str, list[str]]:
+    """
+    Extract useful address components for blocking.
+
+    Returns:
+        {
+            "numbers": [...],
+            "postal_codes": [...],
+            "tokens": [...]
+        }
+
+    This is intentionally heuristic and does not depend on
+    external geographic databases.
+    """
+
+    normalized = normalize_address(text)
+
+    if not normalized:
+        return {
+            "numbers": [],
+            "postal_codes": [],
+            "tokens": [],
+        }
+
+    numbers = extract_numbers(normalized)
+
+    # Postal/PIN-style numeric tokens.
+    # We use length rather than a fixed country list because
+    # the test set contains an unseen country.
+    postal_codes = [
+        number
+        for number in numbers
+        if len(number) in {5, 6}
+    ]
+
+    tokens = normalized.split()
+
+    return {
+        "numbers": numbers,
+        "postal_codes": postal_codes,
+        "tokens": tokens,
+    }
