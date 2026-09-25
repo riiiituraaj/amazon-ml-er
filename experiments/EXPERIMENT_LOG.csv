@@ -1,3 +1,4 @@
 
 E001,2026-09-25,Exact normalized name blocking baseline,Exact normalized name,None,Unicode-safe name normalization,,24.6214%,N/A,N/A,COMPLETED,Recovered 1880670 of 7638365 true links; average 11.2585 candidates per S1
 E002,2026-09-25,Inspection of 30 ground-truth match groups,Analysis only,None,Manual qualitative analysis,,N/A,N/A,N/A,COMPLETED,Observed typos, token reordering, truncation, radically different names with matching addresses, missing addresses, and multilingual/transliteration cases
+E003,Rare address token blocking,60.2831%,220.3654,75.45%,EXPERIMENT,"Very strong recall; demonstrates address importance, but candidate volume is too high for direct final use"
